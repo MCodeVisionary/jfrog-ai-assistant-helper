@@ -73,9 +73,9 @@ Steps on that page:
 Run the setup with the `--admin` flag:
 
 ```bash
-python3 launch_setup.py --admin
-# or
 python3 jfrog_mcp_setup.py --admin
+# or, if you are driving this from a coding agent:
+python3 launch_setup.py --admin
 ```
 
 You need an **Access Token** — created from the admin panel:
@@ -128,6 +128,14 @@ GitHub org admin if this setting is not visible to you.
 
 ### Regular user
 
+If Python 3.9+ is already installed, run the wizard directly:
+
+```bash
+python3 jfrog_mcp_setup.py
+```
+
+If Python is missing, use the bootstrap scripts (they install Python, then launch the wizard):
+
 ```bash
 # macOS / Linux
 bash run.sh
@@ -136,21 +144,30 @@ bash run.sh
 .\run.ps1
 ```
 
-Or if Python is already installed:
-
-```bash
-python3 launch_setup.py
-```
-
 ### Platform Administrator
 
 ```bash
 # macOS / Linux
-python3 launch_setup.py --admin
+python3 jfrog_mcp_setup.py --admin
 
 # Windows
-python launch_setup.py --admin
+python jfrog_mcp_setup.py --admin
 ```
+
+### Driving the setup from a coding agent
+
+Coding agents (Cursor, Claude Code, VS Code + Copilot) cannot drive
+interactive prompts through their Bash tool. For that case, use the
+launcher instead — it opens a fresh terminal window where the wizard
+runs so you can answer the prompts yourself:
+
+```bash
+python3 launch_setup.py            # regular user
+python3 launch_setup.py --admin    # platform administrator
+```
+
+See [HOW_TO_USE.md](HOW_TO_USE.md) for the exact message to paste into
+your agent.
 
 ---
 
