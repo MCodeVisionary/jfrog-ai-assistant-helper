@@ -1,36 +1,71 @@
-# JFrog MCP Gateway — Prerequisites
+# JFrog MCP Gateway
 
-Everything you need to have ready before running the setup wizard.
-
----
-
-## What the script installs automatically
-
-You do **not** need to install these yourself — the setup script handles them:
-
-- **Node.js + npm** — required to run the MCP Gateway
-- **JFrog CLI** — used to register your JFrog server locally
+Setup wizard that wires up the JFrog MCP Gateway in your coding agent
+(Cursor, Claude Code, or VS Code + Copilot).
 
 ---
 
-## What you need to have ready
+## ▶ How to run
+
+> **Start here.** These are the only commands you need to run.
+> See [Before you run](#before-you-run) below for what to have ready first.
+
+### Regular user
+
+If **Python 3.9+** is already installed, run the wizard directly:
+
+```bash
+python3 jfrog_mcp_setup.py
+```
+
+If Python is missing, use the bootstrap scripts — they install Python, then launch the wizard:
+
+```bash
+# macOS / Linux
+bash run.sh
+
+# Windows (PowerShell)
+.\run.ps1
+```
+
+### Platform Administrator
+
+Use the `--admin` flag — the wizard will prompt for an **Access Token** instead of an Identity Token:
+
+```bash
+# macOS / Linux
+python3 jfrog_mcp_setup.py --admin
+
+# Windows
+python jfrog_mcp_setup.py --admin
+```
+
+### Driving the setup from a coding agent
+
+Coding agents can't drive interactive prompts through their Bash tool, so use the launcher — it opens a fresh terminal window where the wizard runs so you can answer the prompts yourself:
+
+```bash
+python3 launch_setup.py            # regular user
+python3 launch_setup.py --admin    # platform administrator
+```
+
+See [HOW_TO_USE.md](HOW_TO_USE.md) for the exact message to paste into your agent.
+
+---
+
+## Before you run
+
+The script installs **Node.js + npm** and the **JFrog CLI** for you. You only need the items below.
 
 ### 1. Python 3.9 or higher
 
-The setup script is written in Python. Check if you have it:
+Check if you have it:
 
 ```bash
 python3 --version
 ```
 
-If Python is missing or too old, use the bootstrap scripts included in this package instead of running the setup script directly:
-
-| OS | Command |
-|---|---|
-| macOS / Linux | `bash run.sh` |
-| Windows | `.\run.ps1` |
-
-The bootstrap installs the correct Python version automatically, then launches the setup wizard.
+If Python is missing or too old, use `bash run.sh` (macOS/Linux) or `.\run.ps1` (Windows) instead of running the wizard directly — they install the correct Python version automatically.
 
 ---
 
@@ -80,16 +115,7 @@ Steps on that page:
 
 #### Platform Administrator
 
-Run the setup with the `--admin` flag:
-
-```bash
-python3 jfrog_mcp_setup.py --admin
-# or, if you are driving this from a coding agent:
-python3 launch_setup.py --admin
-```
-
-You need an **Access Token**. The wizard's browser flow generates this
-automatically when run with `--admin` — same recommendation as above.
+You need an **Access Token**. The wizard's browser flow generates this automatically when run with `--admin` — same recommendation as above.
 
 <details>
 <summary>Manual fallback — generate the access token yourself</summary>
@@ -139,53 +165,6 @@ GitHub.com → Your Organisation → Settings
 
 Without this, Copilot Chat cannot load the JFrog plugin. Contact your
 GitHub org admin if this setting is not visible to you.
-
----
-
-## How to run
-
-### Regular user
-
-If Python 3.9+ is already installed, run the wizard directly:
-
-```bash
-python3 jfrog_mcp_setup.py
-```
-
-If Python is missing, use the bootstrap scripts (they install Python, then launch the wizard):
-
-```bash
-# macOS / Linux
-bash run.sh
-
-# Windows (PowerShell)
-.\run.ps1
-```
-
-### Platform Administrator
-
-```bash
-# macOS / Linux
-python3 jfrog_mcp_setup.py --admin
-
-# Windows
-python jfrog_mcp_setup.py --admin
-```
-
-### Driving the setup from a coding agent
-
-Coding agents (Cursor, Claude Code, VS Code + Copilot) cannot drive
-interactive prompts through their Bash tool. For that case, use the
-launcher instead — it opens a fresh terminal window where the wizard
-runs so you can answer the prompts yourself:
-
-```bash
-python3 launch_setup.py            # regular user
-python3 launch_setup.py --admin    # platform administrator
-```
-
-See [HOW_TO_USE.md](HOW_TO_USE.md) for the exact message to paste into
-your agent.
 
 ---
 
