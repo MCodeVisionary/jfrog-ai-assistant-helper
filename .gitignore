@@ -1,0 +1,74 @@
+# --- Credentials & secrets ---
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+.npmrc
+credentials.json
+secrets.json
+*_token*
+*token.txt
+
+# JFrog / MCP local state
+.jfrog/
+mcp.json
+claude_desktop_config.json
+.jfrog-mcp-*
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+.python-version
+
+# Testing / coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.cache/
+nosetests.xml
+coverage.xml
+*.cover
+
+# --- IDE / OS ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# --- Logs ---
+*.log
+logs/
