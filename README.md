@@ -48,15 +48,23 @@ You need access to a JFrog Platform instance. Ask your JFrog administrator for:
 
 ### 3. A token — two types depending on your role
 
+> **Recommended: let the wizard generate the token for you.**
+> When prompted, choose **`[1] Log in via browser`**. The wizard opens
+> JFrog in your browser, you sign in with your usual credentials (SSO,
+> SAML, LDAP, or username/password), and the token is generated and
+> handed back to the script automatically — no copy/paste.
+>
+> The manual steps below are only needed if the browser flow fails or
+> your environment blocks it.
+
 #### Regular user (default)
 
 You need an **Identity Token** — generated from your own JFrog user profile.
 
-The setup wizard opens the token page for you automatically when you choose
-**Log in via browser**. You log in with your usual credentials (SSO, SAML,
-LDAP, or username/password) and the token is generated automatically.
+<details>
+<summary>Manual fallback — generate the token yourself</summary>
 
-If your browser login does not work, go to:
+Go to:
 
 ```
 https://<your-instance>.jfrog.io/ui/user_profile
@@ -68,6 +76,8 @@ Steps on that page:
 3. Click **Generate** and copy the token
 4. Paste it into the terminal when prompted
 
+</details>
+
 #### Platform Administrator
 
 Run the setup with the `--admin` flag:
@@ -78,7 +88,13 @@ python3 jfrog_mcp_setup.py --admin
 python3 launch_setup.py --admin
 ```
 
-You need an **Access Token** — created from the admin panel:
+You need an **Access Token**. The wizard's browser flow generates this
+automatically when run with `--admin` — same recommendation as above.
+
+<details>
+<summary>Manual fallback — generate the access token yourself</summary>
+
+Go to:
 
 ```
 https://<your-instance>.jfrog.io/ui/admin/configuration/security/access_tokens
@@ -90,6 +106,8 @@ Steps:
 3. Set scope to **Applied Permissions / Admin**
 4. Set expiry as required by your organisation
 5. Click **Generate** and copy the token
+
+</details>
 
 > Access Tokens can only be created by Platform Administrators. If you are
 > not an admin, use the regular user flow above.
