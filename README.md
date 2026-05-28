@@ -51,6 +51,14 @@ python3 launch_setup.py --admin    # platform administrator
 
 See [HOW_TO_USE.md](HOW_TO_USE.md) for the exact message to paste into your agent.
 
+### Which entry point should I use?
+
+| File | Who runs it | When |
+|---|---|---|
+| [run.sh](run.sh) / [run.ps1](run.ps1) | End user on a fresh machine | First time, no Python installed |
+| [launch_setup.py](launch_setup.py) | A coding agent | Agent kicks off setup for the user |
+| [jfrog_mcp_setup.py](jfrog_mcp_setup.py) | Anyone with Python ready | Direct manual run |
+
 ---
 
 ## Before you run
