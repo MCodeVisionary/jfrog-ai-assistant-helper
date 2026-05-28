@@ -23,7 +23,8 @@ What it does automatically:
   9.  Injects all config into the current terminal session
   10. Fetches every available MCP + their tools from the project
   11. Writes a complete mcp.json with all approved MCPs
-  12. Shows the mcp.json location
+  12. Installs Boost and sets it as the default command runner
+  13. Shows the mcp.json location
 """
 
 
@@ -456,7 +457,7 @@ def build_mcp_json(base_url, token, project, agent,
 #  Prerequisite installers  (unchanged from previous version)
 # ─────────────────────────────────────────────────────────────────────────────
 def ensure_node():
-    step(1, 6, "Node.js + npm")
+    step(1, 7, "Node.js + npm")
     if exists("node") and exists("npx"):
         success(f"Node.js already installed  ({ver('node')})"); return
 
@@ -518,7 +519,7 @@ def ensure_node():
 
 
 def ensure_jfrog_cli():
-    step(2, 6, "JFrog CLI")
+    step(2, 7, "JFrog CLI")
     if exists("jf"):
         success(f"JFrog CLI already installed  ({ver('jf')})"); return
 
@@ -1242,7 +1243,7 @@ def collect_credentials(is_admin=False):
 #  NPM Remote repo + npm config
 # ─────────────────────────────────────────────────────────────────────────────
 def ensure_npm_remote(base_url, token):
-    step(3, 6, "NPM Remote repository in JFrog")
+    step(3, 7, "NPM Remote repository in JFrog")
 
     if repo_exists(base_url, token, NPM_REPO_KEY):
         success(f"NPM remote repo '{NPM_REPO_KEY}' already exists")
@@ -1259,7 +1260,7 @@ def ensure_npm_remote(base_url, token):
             info(f"  Key: {NPM_REPO_KEY}   URL: https://registry.npmjs.org")
             pause("Press Enter once done (or to skip)")
 
-    step(4, 6, "Configuring npm to use JFrog")
+    step(4, 7, "Configuring npm to use JFrog")
     doing("Writing ~/.npmrc")
     ok, registry_url = configure_npm_registry(base_url, token, NPM_REPO_KEY)
     done()
@@ -1274,7 +1275,7 @@ def ensure_npm_remote(base_url, token):
 #  Save credentials
 # ─────────────────────────────────────────────────────────────────────────────
 def save_credentials(url, token, project, agent, npm_registry, is_admin=False):
-    step(5, 6, "Saving credentials + configuring JFrog CLI")
+    step(5, 7, "Saving credentials + configuring JFrog CLI")
 
     url_var = "JFROG_URL" if agent == "Claude Code" else "JFROG_PLATFORM_URL"
 
@@ -1356,7 +1357,7 @@ package `@jfrog/mcp-gateway`, fetched via `npx` from the JFrog npm registry:
 _cursor_scope_global = True
 
 def setup_cursor(url, project, npm_registry):
-    step(6, 6, "Configuring Cursor")
+    step(6, 7, "Configuring Cursor")
     global _cursor_scope_global
     print(f"""
     {BOLD}[1]{RESET}  All my projects   → ~/.cursor/rules/
@@ -1448,7 +1449,7 @@ def register_mcps_with_claude_code(mcps, url, token, project, npm_registry):
     info("They will be active in the restarted session.")
 
 def setup_claude_code():
-    step(6, 6, "Configuring Claude Code")
+    step(6, 7, "Configuring Claude Code")
     if not exists("claude"):
         err("Claude Code CLI not found. Install from https://claude.ai/code and re-run.")
         sys.exit(1)
@@ -1469,7 +1470,7 @@ def setup_claude_code():
 
 
 def setup_vscode():
-    step(6, 6, "Configuring VS Code + GitHub Copilot")
+    step(6, 7, "Configuring VS Code + GitHub Copilot")
     if exists("code"):
         success(f"VS Code CLI found  ({ver('code')})")
     else:
@@ -1500,6 +1501,136 @@ def setup_vscode():
       {'Cmd' if IS_MAC else 'Ctrl'}+Shift+P  →  Chat: Install Plugin from Source
       Enter:  https://github.com/jfrog/vscode-plugin/  →  Trust
 """)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Boost — JFrog's command-output optimizer for coding agents
+#  Installs from https://github.com/jfrog/boost and wires it into the chosen
+#  agent so commands the agent runs are auto-compressed (60-90% fewer tokens).
+# ─────────────────────────────────────────────────────────────────────────────
+def _boost_binary():
+    """Locate boost after install — PATH may not include ~/.local/bin yet."""
+    if exists("boost"):
+        return "boost"
+    candidate = os.path.expanduser("~/.local/bin/boost")
+    if os.path.exists(candidate):
+        return candidate
+    return None
+
+
+def install_boost(agent):
+    step(7, 7, "Installing Boost (command-output optimizer)")
+    print(f"""
+  {BOLD}Boost{RESET} turns noisy command output into short, useful signals,
+  cutting agent context usage by 60–90%.  We'll install it and wire it
+  into {BOLD}{agent}{RESET} as the default command runner.
+  {DIM}https://github.com/jfrog/boost{RESET}
+""")
+
+    if IS_WINDOWS:
+        warn("Boost installer supports macOS/Linux only — skipping on Windows.")
+        info("Track Windows support at https://github.com/jfrog/boost")
+        return False
+
+    # ── Terms acknowledgement ─────────────────────────────────────────────
+    print(f"""  {BOLD}Boost is governed by its own Terms of Use.{RESET}
+  {DIM}See:  https://boost.jfrog.com/docs/en/overview/{RESET}
+""")
+    while True:
+        answer = input(f"{BOLD}  ➤  Do you accept the Boost Terms of Use? [Y/n]: {RESET}").strip().lower()
+        if answer in ("", "y", "yes"):
+            break
+        if answer in ("n", "no"):
+            warn("Boost terms not accepted — skipping Boost installation.")
+            info(f"Re-run this wizard to install Boost later, or run manually:")
+            info("  curl -fsSL https://raw.githubusercontent.com/jfrog/boost/main/install.sh | bash")
+            return False
+        warn("Please answer Y or N.")
+
+    # ── Install ────────────────────────────────────────────────────────────
+    if _boost_binary():
+        success(f"Boost already installed  ({ver(_boost_binary())})")
+    else:
+        doing("Downloading and installing Boost")
+        ok, out = run(
+            "curl -fsSL https://raw.githubusercontent.com/jfrog/boost/main/install.sh | bash",
+            capture=True, timeout=180,
+        )
+        done()
+        if not ok or not _boost_binary():
+            err(f"Boost install failed: {out[:200] if out else 'unknown error'}")
+            info("Re-run manually:")
+            info("  curl -fsSL https://raw.githubusercontent.com/jfrog/boost/main/install.sh | bash")
+            return False
+
+        # Add ~/.local/bin to current-process PATH so `boost init` resolves.
+        local_bin = os.path.expanduser("~/.local/bin")
+        if local_bin not in os.environ.get("PATH", "").split(os.pathsep):
+            os.environ["PATH"] = local_bin + os.pathsep + os.environ.get("PATH", "")
+        success(f"Boost installed  ({ver(_boost_binary())})")
+
+    # ── Wire into the chosen agent (default for command runs) ─────────────
+    boost = _boost_binary()
+    if not boost:
+        warn("Boost binary missing after install — skipping `boost init`.")
+        return False
+
+    print()
+    info("Running `boost init --accept-terms` to set Boost as the default")
+    info("command runner for your coding agent ...")
+    print()
+    try:
+        result = subprocess.run([boost, "init", "--accept-terms"], timeout=300)
+        if result.returncode == 0:
+            success(f"Boost is now the default command runner in {agent}")
+            return True
+        warn(f"`boost init` exited with code {result.returncode}")
+    except subprocess.TimeoutExpired:
+        warn("`boost init` timed out after 5 minutes.")
+    except Exception as e:
+        warn(f"`boost init` failed: {e}")
+
+    info(f"Run manually:  {boost} init --accept-terms")
+    return False
+
+
+BOOST_DOCS_URL  = "https://boost.jfrog.com/docs/en/overview/"
+
+
+def boost_report_and_reference(agent):
+    """
+    Combined final section — runs `boost report -i` so its data prints
+    directly in this terminal, then shows docs URLs and a command cheat-sheet.
+    """
+    boost = _boost_binary()
+    if not boost:
+        return
+
+    print(f"\n{BOLD}{CYAN}{chr(9472)*58}")
+    print(f"  📊  Boost — Report & Reference")
+    print(f"{chr(9472)*58}{RESET}\n")
+    info(f"Running `boost report -i` for {agent} ...")
+    print()
+    try:
+        subprocess.run([boost, "report", "-i"], timeout=300)
+    except subprocess.TimeoutExpired:
+        warn("`boost report -i` timed out after 5 minutes.")
+    except Exception as e:
+        warn(f"`boost report -i` failed: {e}")
+        info(f"Run manually:  {boost} report -i")
+
+    print(f"\n  {BOLD}Docs:{RESET}  {CYAN}{BOOST_DOCS_URL}{RESET}\n")
+
+    print(f"  {BOLD}Useful commands:{RESET}\n")
+    rows = [
+        ("boost report -i",            "Interactive report — what Boost wired up"),
+        ("boost report -w",            "Watch / live report (continuous)"),
+    ]
+    width = max(len(cmd) for cmd, _ in rows)
+    for cmd, desc in rows:
+        print(f"    {GREEN}$ {CYAN}{cmd:<{width}}{RESET}   {DIM}{desc}{RESET}")
+    print()
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  Guided post-setup conversation
@@ -1800,6 +1931,7 @@ def completion(agent, url, token, project, npm_registry, env_pairs):
     {GREEN}✓{RESET}  JFrog CLI
     {GREEN}✓{RESET}  NPM repository in JFrog  ({url}/artifactory/api/npm/{NPM_REPO_KEY}/)
     {GREEN}✓{RESET}  {agent} plugin + config
+    {GREEN}✓{RESET}  Boost — default command runner for {agent}
     {GREEN}✓{RESET}  All credentials saved permanently
 
   {BOLD}JFrog instance:{RESET}  {url}
@@ -1919,7 +2051,7 @@ def welcome():
   Detected OS: {BOLD}{os_label}{RESET}  ({_ARCH})
 
   Steps:  Node.js → JFrog CLI → Credentials → NPM repo
-          → npm config → Agent plugin → Session injection
+          → npm config → Agent plugin → Boost (default runner)
           → Fetch MCPs + tools → Write mcp.json
 
   {DIM}Estimated time: 5–8 minutes{RESET}
@@ -1969,7 +2101,13 @@ def main():
     elif agent == "VS Code + Copilot":
         setup_vscode()
 
+    title("Installing Boost")
+    boost_ok = install_boost(agent)
+
     completion(agent, url, token, project, npm_registry, env_pairs)
+
+    if boost_ok:
+        boost_report_and_reference(agent)
 
 
 if __name__ == "__main__":
