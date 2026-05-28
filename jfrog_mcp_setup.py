@@ -29,6 +29,7 @@ What it does automatically:
 
 import os
 import sys
+import re
 import platform
 import subprocess
 import shutil
@@ -95,7 +96,8 @@ def run(cmd, capture=False, timeout=300, env_extra=None):
     try:
         r = subprocess.run(cmd, shell=True, capture_output=capture,
                            text=True, timeout=timeout, env=env)
-        return r.returncode == 0, (r.stdout or "").strip()
+        combined = ((r.stdout or "") + (r.stderr or "")).strip()
+        return r.returncode == 0, combined
     except subprocess.TimeoutExpired:
         return False, "timed out"
     except Exception as e:
@@ -206,14 +208,42 @@ def fetch_available_mcps(base_url, token, project):
         display = spec.get("displayName", pkg)
         desc    = spec.get("description", "")
 
-        # ── tools ──────────────────────────────────────────────────────
-        raw_tools = spec.get("tools", []) or stype.get("tools", [])
+        # ── tools (from toolsInfo, filtered by project allow-policy) ───
+        # The catalog publishes the full tool list at mcpServer.toolsInfo.tools.
+        # Per-project whitelisting lives at toolPolicy.allowToolPolicy.allowedToolsRules
+        # as a list of {regexRule: {pattern: "..."}} entries. Patterns use `*` as
+        # a glob wildcard (e.g. "get_*" matches "get_performance_score").
+        mcp_obj     = entry.get("mcpServer", {})
+        tools_info  = (mcp_obj.get("toolsInfo") or {}).get("tools", [])
+        allow_rules = (entry.get("toolPolicy", {})
+                            .get("allowToolPolicy", {})
+                            .get("allowedToolsRules", []))
+
+        compiled = []
+        for rule in allow_rules:
+            pat = (rule.get("regexRule") or {}).get("pattern", "")
+            if pat:
+                compiled.append(re.compile(re.escape(pat).replace(r"\*", ".*")))
+
+        def _allowed(name):
+            return True if not compiled else any(rx.fullmatch(name) for rx in compiled)
+
         tools = []
-        for t in raw_tools:
-            tname = t.get("name", "") or t.get("toolName", "")
-            tdesc = t.get("description", "")
-            if tname:
-                tools.append({"name": tname, "description": tdesc})
+        for t in tools_info:
+            tname = t.get("name", "")
+            if tname and _allowed(tname):
+                tools.append({"name": tname,
+                              "description": t.get("description", "")})
+
+        # Back-compat fallback for older catalog responses that put tools under
+        # spec.tools or spec.mcpServerType.tools instead of toolsInfo.tools.
+        if not tools:
+            raw_tools = spec.get("tools", []) or stype.get("tools", [])
+            for t in raw_tools:
+                tname = t.get("name", "") or t.get("toolName", "")
+                if tname and _allowed(tname):
+                    tools.append({"name": tname,
+                                  "description": t.get("description", "")})
 
         # ── required env vars ──────────────────────────────────────────
         local_env = (stype.get("local", {})
@@ -348,11 +378,12 @@ def _all_write_paths(agent, scope_global):
 def _build_servers_block(base_url, token, project, npm_registry, mcps):
     """Build the mcpServers dict that is identical across all config files."""
     shared_env = {
-        "JFROG_URL":          base_url,
-        "JFROG_PLATFORM_URL": base_url,
-        "JFROG_ACCESS_TOKEN": token,
-        "JF_PROJECT":         project or "",
-        "JFROG_NPM_REGISTRY": npm_registry,
+        "JFROG_URL":             base_url,
+        "JFROG_PLATFORM_URL":    base_url,
+        "JFROG_ACCESS_TOKEN":    token,
+        "JF_PROJECT":            project or "",
+        "JFROG_NPM_REGISTRY":    npm_registry,
+        "JFROG_AGENT_GUARD_REPO": npm_registry,
     }
     proj = project or ""
 
@@ -1253,11 +1284,12 @@ def save_credentials(url, token, project, agent, npm_registry, is_admin=False):
     tok_var = "JFROG_ACCESS_TOKEN" if is_admin else "JFROG_IDENTITY_TOKEN"
 
     pairs_dict = {
-        url_var:              url,
-        "JFROG_URL":          url,
-        tok_var:              token,     # labelled correctly per role
-        "JFROG_ACCESS_TOKEN": token,     # alias — always written so CLI works
-        "JFROG_NPM_REGISTRY": npm_registry,
+        url_var:                 url,
+        "JFROG_URL":             url,
+        tok_var:                 token,     # labelled correctly per role
+        "JFROG_ACCESS_TOKEN":    token,     # alias — always written so CLI works
+        "JFROG_NPM_REGISTRY":    npm_registry,
+        "JFROG_AGENT_GUARD_REPO": npm_registry,
     }
     if project:
         pairs_dict["JF_PROJECT"] = project
@@ -1371,6 +1403,7 @@ def register_mcps_with_claude_code(mcps, url, token, project, npm_registry):
         f'-e JFROG_ACCESS_TOKEN="{token}" '
         f'-e JF_PROJECT="{project}" '
         f'-e JFROG_NPM_REGISTRY="{npm_registry}" '
+        f'-e JFROG_AGENT_GUARD_REPO="{npm_registry}" '
     )
     doing("Registering jfrog-gateway")
     ok, out = run(
@@ -1397,6 +1430,7 @@ def register_mcps_with_claude_code(mcps, url, token, project, npm_registry):
             f'-e JF_PROJECT="{proj}" '
             f'-e "_JF_MCP_LOADER_ARGS=project={proj}&mcp={pkg}" '
             f'-e JFROG_NPM_REGISTRY="{npm_registry}" '
+            f'-e JFROG_AGENT_GUARD_REPO="{npm_registry}" '
         )
         doing(f"Registering {dname}")
         ok, out = run(
@@ -1569,6 +1603,35 @@ def _show_mcp_tools(mcps):
 
         if i < len(mcps):
             sep()
+
+
+def _show_tools_summary(mcps):
+    """At-a-glance card listing every tool grouped by MCP."""
+    if not mcps:
+        return
+    total = sum(len(m.get("tools") or []) for m in mcps)
+
+    print(f"\n{BOLD}{CYAN}{chr(9472)*58}")
+    if total:
+        print(f"  🧰  Your Toolbox  —  {total} tool{'s' if total != 1 else ''} "
+              f"across {len(mcps)} MCP{'s' if len(mcps) != 1 else ''}")
+    else:
+        print(f"  🧰  Your MCPs  —  {len(mcps)} server{'s' if len(mcps) != 1 else ''} "
+              f"{DIM}(catalog did not publish a tool list){RESET}")
+    print(f"{chr(9472)*58}{RESET}\n")
+
+    for mcp in mcps:
+        name  = mcp.get("display_name") or mcp.get("name") or "(unnamed)"
+        tools = mcp.get("tools") or []
+        if not tools:
+            print(f"  {BOLD}{name}{RESET}  {DIM}(no tools listed in catalog){RESET}\n")
+            continue
+        print(f"  {BOLD}{name}{RESET}  {DIM}({len(tools)} tool{'s' if len(tools) != 1 else ''}){RESET}")
+        for t in tools:
+            tname = t.get("name") if isinstance(t, dict) else None
+            if tname:
+                print(f"    {GREEN}•{RESET}  {tname}")
+        print()
 
 
 def _show_mcp_json_location(primary_path, mcps, agent):
@@ -1814,6 +1877,9 @@ def completion(agent, url, token, project, npm_registry, env_pairs):
         print(f"  Registering MCP servers in Claude Code")
         print(f"{chr(9472)*58}{RESET}")
         register_mcps_with_claude_code(mcps, url, token, project, npm_registry)
+
+    # ── Phase 5c: at-a-glance toolbox summary ─────────────────────────────
+    _show_tools_summary(mcps)
 
     # ── Phase 6: closing message / Claude Code restart ───────────────────
     if agent == "Claude Code":

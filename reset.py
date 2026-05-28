@@ -108,6 +108,7 @@ ENV_VAR_NAMES = [
     "JFROG_ACCESS_TOKEN",
     "JF_PROJECT",
     "JFROG_NPM_REGISTRY",
+    "JFROG_AGENT_GUARD_REPO",
 ]
 
 def reset_env_vars():
